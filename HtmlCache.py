@@ -1,8 +1,8 @@
 from os import path
 from time import sleep
-from random import randint
 
 import requests
+from random import randint
 
 
 class HtmlCache:
@@ -12,9 +12,10 @@ class HtmlCache:
     def get_base_dir(self) -> str:
         return self.__cache_base_dir
 
-    def get(self, url: str, filepath: str) -> str | None:
-        if path.exists(f'{filepath}'):
-            with open(filepath, 'r') as fp:
+    def get(self, url: str, cache_file_path: str) -> str | None:
+
+        if path.exists(f'{cache_file_path}'):
+            with open(cache_file_path, 'r') as fp:
                 return fp.read()
 
         # sleep for a random amount of time, to prevent flooding a site with requests
@@ -26,7 +27,8 @@ class HtmlCache:
         if req.status_code != 200:
             return None
 
-        with open(f'{self.__cache_base_dir}/{filepath}', 'w') as fp:
+        # TODO: if the basedir path doesn't exist, create it
+        with open(f'{cache_file_path}', 'w') as fp:
             fp.write(req.text)
 
         return req.text

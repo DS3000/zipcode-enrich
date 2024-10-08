@@ -10,12 +10,13 @@ from ZipcodeInfo import ZipcodeInfo
 class CodigoPostalPtExtractor(ZipInfoExtractor):
     __base_url: str = field(init=False, default=r'https://www.codigo-postal.pt')
     __url_fmt: str = field(init=False, default=r'https://www.codigo-postal.pt/?cp4={cp4}&cp3={cp3}')
+    extractor_cache_subdir = "codigopsotalpt"
 
     def fetch_info(self, zip_info: ZipcodeInfo) -> LocaleInfo | None:
         url = self.__url_fmt.format(cp4=zip_info.cp4,
                                     cp3=zip_info.cp3)
 
-        cache_filepath = f'{self.cache.get_base_dir()}/{zip_info.cp4}-{zip_info.cp3}.html'
+        cache_filepath = f'{self.cache.get_base_dir()}/{self.extractor_cache_subdir}/{zip_info.cp4}-{zip_info.cp3}.html'
         text = self.cache.get(url, cache_filepath)
         if text is None:
             return
@@ -35,14 +36,12 @@ class CodigoPostalPtExtractor(ZipInfoExtractor):
             return None
 
         href = place_link['href']
-        print("info url: " + self.__base_url + href)
 
         place_info_link = self.__base_url + href
-        cache_filepath = f"{self.cache.get_base_dir()}/{zipcode_info.cp4}-{zipcode_info.cp3}-local.html"
+        cache_filepath = f"{self.cache.get_base_dir()}/{self.extractor_cache_subdir}/{zipcode_info.cp4}-{zipcode_info.cp3}-local.html"
 
         place_info_html = self.cache.get(place_info_link, cache_filepath)
         if place_info_html is None:
-            print("Failed to get cached local info file.")
             return None
 
         soup2 = BeautifulSoup(place_info_html, 'html.parser')
