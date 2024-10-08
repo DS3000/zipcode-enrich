@@ -1,9 +1,11 @@
 import csv
+from datetime import datetime, UTC
 from typing import List
 
 from CodigoPostalPtExtractor import CodigoPostalPtExtractor
 from CttCodigoPostalExtractor import CttCodigoPostalExtractor
 from HtmlCache import HtmlCache
+from LocaleInfo import LocaleInfo
 from ZipInfoExtractor import ZipInfoExtractor
 from ZipcodeInfo import ZipcodeInfo
 
@@ -28,13 +30,14 @@ def main():
     missing_data_log_filepath = 'missing.txt'
 
     failed_requests_fp = open(failed_requests_log_filepath, 'a')
+    failed_requests_fp.write("\n\n")
     missing_data_fp = open(missing_data_log_filepath, 'a')
-
+    missing_data_fp.write("\n\n")
     html_cache: HtmlCache = HtmlCache('cache')
 
     extractors: List[ZipInfoExtractor] = [
         CodigoPostalPtExtractor(html_cache),
-        # CttCodigoPostalExtractor(html_cache)
+        CttCodigoPostalExtractor(html_cache)
     ]
 
     infos = zipcode_infos_from_csv(csv_file_path)
@@ -48,16 +51,18 @@ def main():
         print()
         print(f"{i} CP: {zip_info.cp4}-{zip_info.cp3}")
 
+        res: LocaleInfo | None = None
         got_info = False
         for ex in extractors:
             res = ex.fetch_info(zip_info)
             if res is not None:
                 got_info = True
+                print(f"Extractor {ex.__class__.__name__} got a hit")
                 break
 
         if not got_info:
             print("Failed to get info")
-            missing_data_fp.write(f"{zip_info}\n")
+            missing_data_fp.write(f"{datetime.now(UTC)} - {zip_info}\n")
             continue
 
         print(f"Got {res}")
