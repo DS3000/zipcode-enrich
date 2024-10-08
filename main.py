@@ -1,14 +1,11 @@
-from zipcodeInfo import ZipcodeInfo
-
 import csv
-from os import path
 from typing import List
 
-from bs4 import BeautifulSoup
-import requests
-
-from random import randint
-from time import sleep
+from CodigoPostalPtExtractor import CodigoPostalPtExtractor
+from CttCodigoPostalExtractor import CttCodigoPostalExtractor
+from HtmlCache import HtmlCache
+from ZipInfoExtractor import ZipInfoExtractor
+from ZipcodeInfo import ZipcodeInfo
 
 
 def zipcode_infos_from_csv(filepath: str) -> List[ZipcodeInfo]:
@@ -25,89 +22,47 @@ def zipcode_infos_from_csv(filepath: str) -> List[ZipcodeInfo]:
         return result
 
 
-def get_from_html_cache(cache_path: str, district_code: str, street_code: str) -> str | None:
-    filepath = f"{cache_path}/{district_code}-{street_code}.html"
-    if path.exists(filepath):
-        with open(filepath, 'r') as fp:
-            data = fp.read()
-            return data
-    return None
-
-
-def cache_html(cache_path: str, district_code: str, street_code: str, text: str):
-    filepath = f"{cache_path}/{district_code}-{street_code}.html"
-    with open(filepath, 'w') as fp:
-        fp.write(text)
-
-
 def main():
     csv_file_path = r"codigos_postais.csv"
-    url_fmt = r'https://www.codigo-postal.pt/?cp4={zip_district}&cp3={zip_street}'
-    cache_path = 'cache'
     failed_requests_log_filepath = 'failed.txt'
+    missing_data_log_filepath = 'missing.txt'
 
     failed_requests_fp = open(failed_requests_log_filepath, 'a')
+    missing_data_fp = open(missing_data_log_filepath, 'a')
+
+    html_cache: HtmlCache = HtmlCache('cache')
+
+    extractors: List[ZipInfoExtractor] = [
+        CodigoPostalPtExtractor(html_cache),
+        # CttCodigoPostalExtractor(html_cache)
+    ]
 
     infos = zipcode_infos_from_csv(csv_file_path)
 
-    infos_slice = infos[:120]
+    slice_start_idx = 0
+    slice_end_idx = 100
 
-    for i, zipInfo in enumerate(infos_slice):
+    infos_slice = infos[slice_start_idx: slice_end_idx]
+
+    for i, zip_info in enumerate(infos_slice):
         print()
-        print(f"{i} CP: {zipInfo.district_code}-{zipInfo.street_code}")
-        url = url_fmt.format(zip_district=zipInfo.district_code, zip_street=zipInfo.street_code)
+        print(f"{i} CP: {zip_info.cp4}-{zip_info.cp3}")
 
-        print(f"Getting from {url}")
+        got_info = False
+        for ex in extractors:
+            res = ex.fetch_info(zip_info)
+            if res is not None:
+                got_info = True
+                break
 
-        text: str = get_from_html_cache(cache_path, zipInfo.district_code, zipInfo.street_code)
-
-        if text is None:
-            print("HTML data not cached. Downloading...")
-
-            min_sleep_sec = 1
-            max_sleep_sec = 5
-            sleep(randint(min_sleep_sec, max_sleep_sec))  # sleep before getting HTML
-
-            page = requests.get(url)
-            if page.status_code != 200:
-                print(f"Failed to get with status code {page.status_code}")
-                failed_requests_fp.write(f"url: {url} code: {page.status_code}\n")
-                continue
-            text = page.text
-            cache_html(cache_path, zipInfo.district_code, zipInfo.street_code, text)
-        else:
-            print("HTML data was cached.")
-
-        soup = BeautifulSoup(text, 'html.parser')
-        selector_entries = '#isolated > div'
-        entries = soup.select(selector_entries)
-        if len(entries) == 0:
-            print("No entries")
+        if not got_info:
+            print("Failed to get info")
+            missing_data_fp.write(f"{zip_info}\n")
             continue
 
-        first_entry = entries[0]
+        print(f"Got {res}")
 
-        #TODO: follow the URL from the first local, and grab Distrito and Concelho from there,
-        # instead of doing this, which is erroneous
-
-        locals_class_selector = '.local'
-        entries_locals = first_entry.select(locals_class_selector)
-        if len(entries_locals) == 0:
-            print("No locals")
-            continue
-
-        first_local = entries_locals[0]
-
-        first_local_parts = [x.strip() for x in first_local.text.split(',')]
-        if len(first_local_parts) < 2:
-            print("Missing Concelho and Distrito")
-            continue
-
-        local_concelho = first_local_parts[-2]
-        local_distrito = first_local_parts[-1]
-
-        print(f"Concelho: {local_concelho}, Distrito: {local_distrito}")
-
+    missing_data_fp.close()
     failed_requests_fp.close()
 
 
