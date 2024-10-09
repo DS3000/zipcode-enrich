@@ -15,7 +15,7 @@ class HtmlCache:
     def get(self, url: str, cache_file_path: str) -> str | None:
 
         if path.exists(f'{cache_file_path}'):
-            with open(cache_file_path, 'r') as fp:
+            with open(cache_file_path, 'r', encoding='utf8') as fp:
                 return fp.read()
 
         # sleep for a random amount of time, to prevent flooding a site with requests
@@ -28,7 +28,7 @@ class HtmlCache:
             return None
 
         # TODO: if the basedir path doesn't exist, create it
-        with open(f'{cache_file_path}', 'w') as fp:
+        with open(f'{cache_file_path}', 'w', encoding='utf8') as fp:
             fp.write(req.text)
 
         return req.text
