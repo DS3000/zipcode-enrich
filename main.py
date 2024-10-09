@@ -61,11 +61,6 @@ def get_locale_info():
 
     try:
         parts = codigo_postal.split('-')
-
-        # make sure they're valid numbers
-        cp4 = int(parts[0])
-        cp3 = int(parts[1])
-
         zip_info: ZipcodeInfo = ZipcodeInfo(parts[0], parts[1])
     except:
         msg = (
