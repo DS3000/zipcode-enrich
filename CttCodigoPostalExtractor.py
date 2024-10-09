@@ -4,7 +4,7 @@ from typing import Dict
 from LocaleInfo import LocaleInfo
 from ZipInfoExtractor import ZipInfoExtractor
 from ZipcodeInfo import ZipcodeInfo
-from secrets import cttcodigpostal_api_key
+from my_secrets import cttcodigpostal_api_key
 
 
 class CttCodigoPostalExtractor(ZipInfoExtractor):
