@@ -3,7 +3,9 @@ class LocaleInfo:
     concelho: str
 
     def __init__(self, distrito: str, concelho: str):
-        assert(len(distrito) > 0 and len(concelho) > 0, "Does not accept empty strings")
+        if not (len(distrito) > 0 and len(concelho) > 0):
+            raise Exception("distrito and concelho must be strings with non-zero length")
+
         self.distrito = distrito.lower()
         self.concelho = concelho.lower()
 
