@@ -12,7 +12,10 @@ from LocaleInfo import LocaleInfo
 from ZipInfoExtractor import ZipInfoExtractor
 from ZipcodeInfo import ZipcodeInfo
 
-cnx = mysql.connector.connect(user='root', database='zipcode_db', host='localhost', password=my_secrets.db_password)
+DB_USER = 'root'
+DB_SCHEMA_NAME = 'zipcode_db'
+DB_HOST = 'localhost'
+cnx = mysql.connector.connect(user=DB_USER, database=DB_SCHEMA_NAME, host=DB_HOST, password=my_secrets.db_password)
 
 
 def db_search_for_zipcode(zip_info: ZipcodeInfo) -> LocaleInfo | None:
@@ -168,7 +171,7 @@ def main():
     infos = zipcode_infos_from_csv(csv_file_path)
 
     slice_start_idx = 0
-    slice_end_idx = 200
+    slice_end_idx = len(infos)
 
     infos_slice = infos[slice_start_idx: slice_end_idx]
 
