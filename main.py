@@ -18,16 +18,14 @@ cnx = mysql.connector.connect(user='root', database='zipcode_db', host='localhos
 def db_search_for_zipcode(zip_info: ZipcodeInfo) -> LocaleInfo | None:
     with cnx.cursor() as cursor:
         query = (
-            "select t_concelho.name, t_distrito.name, t_infomap.zip from t_infomap"
-            " left join t_concelho on t_concelho.id_concelho=t_infomap.id_concelho"
-            " left join t_distrito on t_distrito.id_distrito=t_infomap.id_distrito"
-            f" where t_infomap.zip='{zip_info}'"
+            "select cp7, concelho, distrito from t_infos"
+            f" where cp7='{zip_info}'"
         )
         cursor.execute(query)
         print("Query results:")
 
-        for concelho, distrito, zipcode in cursor:
-            print(f"Concelho: {concelho}, Distrito: {distrito}, zipcode: {zipcode}")
+        for cp7, concelho, distrito in cursor:
+            print(f"Concelho: {concelho}, Distrito: {distrito}, cp7: {cp7}")
             return LocaleInfo(distrito, concelho)
 
     return None
@@ -81,8 +79,8 @@ def get_locale_info():
 
     print(f"Request made, with info {zip_info}")
 
-    res = info_map.get(zip_info)
-    # res = db_search_for_zipcode(zip_info)
+    # res = info_map.get(zip_info)
+    res = db_search_for_zipcode(zip_info)
     print(f"Got {res}")
 
     if res is None:
@@ -120,49 +118,57 @@ def dump_infos_to_csv(filepath: str, infos: Dict[ZipcodeInfo, LocaleInfo]):
             csv_writer.writerow([f"{zip_info.cp4}-{zip_info.cp3}", locale_info.concelho, locale_info.distrito])
 
 
-def insert_into_db(info_map: Dict[ZipcodeInfo, LocaleInfo]):
-    insert_into_concelho_query = "insert into t_concelho (name) values(%(concelho_name)s)"
-    insert_into_distrito_query = "insert into t_distrito (name) values(%(distrito_name)s)"
-    insert_into_infomap_query = ("insert into t_infomap (id_concelho, id_distrito, zip)"
-                                 " values(%(id_concelho)s, %(id_distrito)s, %(zip_code)s)")
+def clear_db():
+    truncate_query = "truncate table t_infos"
+    with cnx.cursor() as cursor:
+        try:
+            cursor.execute(truncate_query)
+            cnx.commit()
+        except mysql.connector.Error as e:
+            print("Error code:", e.errno)  # error number
+            print("SQLSTATE value:", e.sqlstate)  # SQLSTATE value
+            print("Error message:", e.msg)  # error message
+            print("Error:", e)  # errno, sqlstate, msg values
+            s = str(e)
+            print("Error:", s)  # errno, sqlstate, msg values
 
+
+def insert_into_db(info_map: Dict[ZipcodeInfo, LocaleInfo]) -> int | None:
+    insert_query = "insert into t_infos (cp7, concelho, distrito) values(%(cp7)s, %(concelho)s, %(distrito)s)"
+
+    inserted_count = 0
     for zipcode_info, locale_info in info_map.items():
         with cnx.cursor() as cursor:
             try:
-                cursor.execute(insert_into_concelho_query, {"concelho_name": locale_info.concelho})
-                id_concelho = cursor.lastrowid
-
-                cursor.execute(insert_into_distrito_query, {"distrito_name": locale_info.distrito})
-                id_distrito = cursor.lastrowid
-
                 data = {
-                    'id_distrito': id_distrito,
-                    'id_concelho': id_concelho,
-                    'zip_code': str(zipcode_info)
+                    'distrito': locale_info.distrito,
+                    'concelho': locale_info.concelho,
+                    'cp7': str(zipcode_info)
                 }
-
-                cursor.execute(insert_into_infomap_query, data)
-
+                cursor.execute(insert_query, data)
+                # id_concelho = cursor.lastrowid
                 cnx.commit()
+                inserted_count += 1
             except mysql.connector.Error as e:
-                # TODO: handle duplicate entries
+                if e.errno == 1062:
+                    # don't handle duplicates; just move on
+                    return
                 print("Error code:", e.errno)  # error number
                 print("SQLSTATE value:", e.sqlstate)  # SQLSTATE value
                 print("Error message:", e.msg)  # error message
                 print("Error:", e)  # errno, sqlstate, msg values
                 s = str(e)
                 print("Error:", s)  # errno, sqlstate, msg values
+    return inserted_count
 
 
 def main():
     csv_file_path = r"codigos_postais.csv"
-    failed_requests_log_filepath = 'failed.txt'
     missing_data_log_filepath = 'missing.txt'
 
-    failed_requests_fp = open(failed_requests_log_filepath, 'a')
-    failed_requests_fp.write("\n\n")
     missing_data_fp = open(missing_data_log_filepath, 'a')
     missing_data_fp.write("\n\n")
+    failed_count = 0
 
     infos = zipcode_infos_from_csv(csv_file_path)
 
@@ -185,6 +191,7 @@ def main():
                 break
 
         if not got_info:
+            failed_count += 1
             print("Failed to get info")
             missing_data_fp.write(f"{datetime.now(UTC)} - {zip_info}\n")
             continue
@@ -193,13 +200,18 @@ def main():
         print(f"Got {res}")
 
     missing_data_fp.close()
-    failed_requests_fp.close()
+
+    print(f"Parsed {len(infos_slice)}, got {len(info_map)} successfully, failed {failed_count}")
+    assert (len(infos_slice) == (len(info_map) + failed_count),
+            "Mismatching count of parsed entries, and sum of succeeded and failed fetches")
 
     dump_infos_to_csv('enriched.csv', info_map)
 
-    insert_into_db(info_map)
+    clear_db()
+    inserted_count = insert_into_db(info_map)
+    print(f"Inserted {inserted_count} entries into the database.")
 
-    print("Serving API now...")
+    print("Serving HTTP API now...")
     flask_app.run()
 
     cnx.close()
