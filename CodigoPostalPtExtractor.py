@@ -20,9 +20,10 @@ class CodigoPostalPtExtractor(ZipInfoExtractor):
         text = self.cache.get(url, cache_filepath)
         if text is None:
             return
-
-        res = self.__parse_html_data(text, zip_info)
-        return res
+        try:
+            return self.__parse_html_data(text, zip_info)
+        except:
+            return None
 
     def __parse_html_data(self, text: str, zipcode_info: ZipcodeInfo) -> LocaleInfo | None:
         soup = BeautifulSoup(text, 'html.parser')
@@ -62,6 +63,9 @@ class CodigoPostalPtExtractor(ZipInfoExtractor):
 
         parts = [x.strip().split(': ') for x in parts]
         for part in parts:
+            if len(part) < 2:
+                continue
+
             label = part[0]
             info = part[1]
 
