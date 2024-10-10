@@ -1,3 +1,5 @@
+from sys import stderr
+
 import csv
 import mysql.connector
 from datetime import datetime, UTC
@@ -15,7 +17,12 @@ from ZipcodeInfo import ZipcodeInfo
 DB_USER = 'root'
 DB_SCHEMA_NAME = 'zipcode_db'
 DB_HOST = 'localhost'
-cnx = mysql.connector.connect(user=DB_USER, database=DB_SCHEMA_NAME, host=DB_HOST, password=my_secrets.db_password)
+try:
+    cnx = mysql.connector.connect(user=DB_USER, database=DB_SCHEMA_NAME, host=DB_HOST, password=my_secrets.db_password)
+except Exception as e:
+    print("Failed to connect to the database server")
+    print(e, file=stderr)
+    exit(1)
 
 
 def db_search_for_zipcode(zip_info: ZipcodeInfo) -> LocaleInfo | None:
